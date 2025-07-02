@@ -1,7 +1,16 @@
 use std::process::Command;
 use thiserror::Error;
 
-use crate::MachineData;
+#[derive(Clone, Debug)]
+pub struct MachineData {
+    pub ip: String,
+    pub hostname: String,
+    pub online: bool,
+    user: String,
+    os: String,
+    details: String,
+}
+
 
 /// Defines the possible errors that can occur when interacting with the Tailscale CLI.
 #[derive(Error, Debug)]
