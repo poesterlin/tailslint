@@ -1,5 +1,4 @@
 use cli_clipboard;
-use gtk::gdk::keys::constants::Break;
 use std::thread;
 use tray_icon::{
     TrayIconBuilder,
@@ -25,27 +24,23 @@ fn main() {
     let handle = thread::spawn(run_tray_app);
     handle.join().unwrap();
 }
+
+enum AppMessage {
+    Toggle,
+    Refresh,
+    Quit,
+    CopyIp(String),
+}
+
 /// Runs the entire tray application logic within the GTK event loop.
 fn run_tray_app() {
-    // --- 1. Initialization ---
     gtk::init().unwrap();
-    let icon = load_icon("imgs/tailscale-32x32.png");
 
-    // A simple message enum to communicate from the event handler to the main thread.
-    // This MUST be `Send`.
-    enum AppMessage {
-        Toggle,
-        Refresh,
-        Quit,
-        CopyIp(String),
-    }
+    const ICON_BYTES: &[u8] = include_bytes!("../imgs/tailscale-32x32.png");
+    let icon = load_icon_from_bytes(ICON_BYTES);
 
-    // --- 2. Create the channel for cross-thread communication ---
     let (tx, rx) = std::sync::mpsc::channel::<AppMessage>();
 
-    // --- 3. Create the initial menu and tray icon on the main thread ---
-    // The `tray_icon` variable will be moved into the idle handler later.
-    // It NEVER leaves the main GTK thread.
     let tray_icon = TrayIconBuilder::new()
         .with_menu(Box::new(rebuild_menu()))
         .with_tooltip("Tailscale Control")
@@ -53,8 +48,6 @@ fn run_tray_app() {
         .build()
         .unwrap();
 
-    // --- 4. Set the Global Event Handler ---
-    // The handler's closure only captures the `tx` sender, which IS thread-safe.
     tray_icon::menu::MenuEvent::set_event_handler(Some(move |event: muda::MenuEvent| {
         let (toggle_id, refresh_id, quit_id) = get_menu_item_ids();
         let event_id = event.id();
@@ -100,10 +93,9 @@ fn run_tray_app() {
             }
         }
 
-       glib::ControlFlow::Continue
+        glib::ControlFlow::Continue
     });
 
-    // --- 6. Run the GTK Event Loop ---
     gtk::main();
 }
 
@@ -160,14 +152,11 @@ fn get_menu_item_ids() -> (MenuId, MenuId, MenuId) {
 }
 
 /// Helper function to load a PNG icon for the tray.
-fn load_icon(path: &str) -> tray_icon::Icon {
-    let (icon_rgba, icon_width, icon_height) = {
-        let image = image::open(path)
-            .expect("Failed to open icon path")
-            .into_rgba8();
-        let (width, height) = image.dimensions();
-        let rgba = image.into_raw();
-        (rgba, width, height)
-    };
-    tray_icon::Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
+fn load_icon_from_bytes(bytes: &[u8]) -> tray_icon::Icon {
+    let image = image::load_from_memory(bytes)
+        .expect("Failed to load icon from memory")
+        .into_rgba8();
+    let (width, height) = image.dimensions();
+    let rgba = image.into_raw();
+    tray_icon::Icon::from_rgba(rgba, width, height).expect("Failed to create tray icon")
 }
