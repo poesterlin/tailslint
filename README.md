@@ -1,4 +1,4 @@
-# Tailslint
+# Trayscale
 
 Wrapper for Tailscale CLI using [Slint](https://docs.slint.dev/latest/docs/slint/), build in Rust.
 
